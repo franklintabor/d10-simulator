@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>D10 Staffing Simulator</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    label { display: block; margin-top: 10px; }
+    canvas { max-width: 900px; margin-top: 20px; }
+  
+    .slider-group {
+      display: flex;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .slider-label {
+      width: 220px;
+      display: inline-block;
+    }
+    </style>
+</head>
+<body>
+  <h1>D10 Staffing Simulator</h1>
+
+  
+<div style="display: flex; gap: 40px; flex-wrap: wrap; align-items: flex-start;">
+
+  <!-- Left Column: General Settings -->
+  <div style="flex: 1; min-width: 300px;">
+    <div class="slider-group"><div class="slider-label">Success Rate (%): </div><input type="range" id="successRate" min="25" max="100" value="60" oninput="updateChart()"> <span id="srVal">60</span></div>
+    <div class="slider-group"><div class="slider-label">Training Time (months): </div><input type="range" id="trainingTime" min="1" max="60" value="36" oninput="updateChart()"> <span id="ttVal">36</span></div>
+    <div class="slider-group"><div class="slider-label">Retirement Offset (+/-25 Years): </div><input type="range" id="retirementOffset" min="-5" max="5" value="0" oninput="updateChart()"> <span id="roVal">0</span></div>
+    <div class="slider-group"><div class="slider-label">Attrition Per Year:</div><input type="range" id="attrition" min="0" max="5" step="0.5" value="0" oninput="updateChart()"> <span id="attritionVal">0</span></div>
+  </div>
+
+  <!-- Right Column: Trainees Per Year -->
+  <div style="flex: 1; min-width: 300px;">
+    <div class="slider-group"><div class="slider-label">Trainees in 2025: </div><input type="range" id="trainees_2025" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2025">6</span></div>
+    <div class="slider-group"><div class="slider-label">Trainees in 2026: </div><input type="range" id="trainees_2026" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2026">6</span></div>
+    <div class="slider-group"><div class="slider-label">Trainees in 2027: </div><input type="range" id="trainees_2027" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2027">6</span></div>
+    <div class="slider-group"><div class="slider-label">Trainees in 2028: </div><input type="range" id="trainees_2028" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2028">6</span></div>
+    <div class="slider-group"><div class="slider-label">Trainees in 2029: </div><input type="range" id="trainees_2029" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2029">6</span></div>
+    <div class="slider-group"><div class="slider-label">Trainees in 2030: </div><input type="range" id="trainees_2030" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2030">6</span></div>
+    <div class="slider-group"><div class="slider-label">Trainees in 2031: </div><input type="range" id="trainees_2031" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2031">6</span></div>
+    <div class="slider-group"><div class="slider-label">Trainees in 2032: </div><input type="range" id="trainees_2032" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2032">6</span></div>
+    <div class="slider-group"><div class="slider-label">Trainees in 2033: </div><input type="range" id="trainees_2033" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2033">6</span></div>
+    <div class="slider-group"><div class="slider-label">Trainees in 2034: </div><input type="range" id="trainees_2034" min="0" max="60" value="6" oninput="updateChart()"> <span id="tp_2034">6</span></div>
+  </div>
+
+</div>
+<canvas id="staffChart" width="900" height="400"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const baseRetirements = {
+      2020: 4, 2021: 4, 2022: 6, 2023: 7, 2024: 4, 2025: 2, 2026: 2, 2027: 3, 2028: 6, 2029: 9,
+      2030: 2, 2031: 7, 2032: 10, 2033: 12, 2034: 21, 2035: 17, 2036: 7, 2037: 7, 2038: 4, 2039: 2,
+      2041: 6, 2042: 1, 2043: 1, 2044: 1, 2045: 1, 2046: 2, 2047: 1, 2049: 1, 2050: 1
+    };
+
+    let chart;
+
+    window.onload = function () {
+      const years = [...Array(10).keys()].map(i => 2025 + i);
+      const targetCPCs = 111;
+      const target85 = Math.round(targetCPCs * 0.85);
+      const initialCPCs = 71;
+
+      const ctx = document.getElementById('staffChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: years,
+          datasets: [
+            { label: 'CPCs', borderColor: 'blue', fill: false, data: [] },
+            {
+              label: 'Trainees (Red > 60% of CPCs)',
+              fill: false,
+              data: [],
+              segment: {
+                borderColor: ctx => {
+                  const i = ctx.p0DataIndex;
+                  const cpc = chart.data.datasets[0].data[i];
+                  const trainee = chart.data.datasets[1].data[i];
+                  return cpc > 0 && trainee / cpc > 0.6 ? 'red' : 'orange';
+                }
+              }
+            },
+            { label: '85% Target (94)', borderColor: 'green', borderDash: [5, 5], data: Array(10).fill(target85), fill: false },
+            { label: 'Hard Target (111)', borderColor: 'gray', borderDash: [2, 4], data: Array(10).fill(targetCPCs), fill: false }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { title: { display: true, text: 'Year' } },
+            y: { beginAtZero: true, title: { display: true, text: 'Count' } }
+          },
+          plugins: {
+            legend: {
+              labels: {
+                generateLabels: function(chart) {
+                  const labels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                  labels.forEach(label => {
+                    if (label.text.includes('Trainees')) {
+                      label.strokeStyle = 'red';
+                      label.fillStyle = 'orange';
+                    }
+                  });
+                  return labels;
+                }
+              },
+              position: 'bottom'
+            }
+          }
+        }
+      });
+
+      updateChart();
+    };
+
+    window.updateChart = function () {
+      const successRate = +document.getElementById('successRate').value;
+      const trainingTime = Math.ceil(+document.getElementById("trainingTime").value / 12);
+      const retirementOffset = +document.getElementById('retirementOffset').value;
+      const attrition = +document.getElementById('attrition').value;
+      document.getElementById('attritionVal').textContent = attrition;
+
+      document.getElementById('srVal').textContent = successRate;
+      document.getElementById("ttVal").textContent = document.getElementById("trainingTime").value;
+      document.getElementById('roVal').textContent = retirementOffset;
+
+      const washoutRate = 1 - (successRate / 100);
+      let cpcs = 71;
+      let pipeline = Array(trainingTime).fill(0);
+      let cpcHistory = [];
+      let traineeHistory = [];
+
+      const traineeInputs = [
+        document.getElementById("trainees_2025").value, document.getElementById("trainees_2026").value,
+        document.getElementById("trainees_2027").value, document.getElementById("trainees_2028").value,
+        document.getElementById("trainees_2029").value, document.getElementById("trainees_2030").value,
+        document.getElementById("trainees_2031").value, document.getElementById("trainees_2032").value,
+        document.getElementById("trainees_2033").value, document.getElementById("trainees_2034").value
+      ];
+
+      for (let yearIndex = 0; yearIndex < 10; yearIndex++) {
+        const simYear = 2025 + yearIndex;
+        const offsetYear = simYear + retirementOffset;
+        const retiring = baseRetirements[offsetYear] || 0;
+
+        const traineesThisYear = parseInt(traineeInputs[yearIndex]);
+        const graduating = Math.floor(pipeline[0] * (1 - washoutRate));
+        cpcs = Math.max(cpcs + graduating - retiring - attrition, 0);
+        pipeline = pipeline.slice(1);
+        pipeline.push(traineesThisYear);
+        const totalTrainees = pipeline.reduce((a, b) => a + b, 0);
+
+        cpcHistory.push(cpcs);
+        traineeHistory.push(totalTrainees);
+
+        document.getElementById("tp_" + (2025 + yearIndex)).textContent = traineesThisYear;
+      }
+
+      chart.data.datasets[0].data = cpcHistory;
+      chart.data.datasets[1].data = traineeHistory;
+      chart.update();
+    };
+  </script>
+</body>
+</html>
